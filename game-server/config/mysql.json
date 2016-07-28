@@ -1,0 +1,17 @@
+{
+	"development": {
+	  "host" : "123.57.82.240",
+		"port" : "3306",
+		"database" : "chuxin_beta",
+		"user" : "chuxin",
+		"password" : "Chuxin!@#"
+	},
+
+	"production": {
+		"host" : "123.57.82.240",
+		"port" : "3306",
+		"database" : "chuxin_beta",
+		"user" : "chuxin",
+		"password" : "Chuxin!@#"
+	}
+}

@@ -5,7 +5,7 @@ module.exports = function(app) {
 var Handler = function(app) {
 		this.app = app;
 };
-
+var logger = require('pomelo-logger').getLogger(__filename);
 var handler = Handler.prototype;
 
 /**
@@ -16,37 +16,59 @@ var handler = Handler.prototype;
  * @param  {Function} next    next stemp callback
  * @return {Void}
  */
-handler.enter = function(msg, session, next) {
-	var self = this;
-	var rid = msg.rid;
-	var uid = msg.username + '*' + rid
-	var sessionService = self.app.get('sessionService');
+handler.enter = function (msg, session, next) {
+    var self = this;
+    var rid = msg.rid;
+    var uid = msg.username + '*' + rid
+    var sessionService = self.app.get('sessionService');
+    var utils = require('../../../util/utils');
+    utils.checkUser(msg.username, msg.rid, function (err, res) {
+        if (err) {
+            console.error('[register] fail to invoke createPlayer for ' + err.stack);
+            next(null, {
+                code: 500
+            });
+            return;
+        }
+        if (!!res && res.length === 1) {
+            var rs = res[0];
+            var userId = rs.uid;
+            console.error('[register] uid: ' + userId);
+            //duplicate log in
+            if (!!sessionService.getByUid(uid)) {
+                next(null, {
+                    code: 500,
+                    error: true
+                });
+                return;
+            }
 
-	//duplicate log in
-	if( !! sessionService.getByUid(uid)) {
-		next(null, {
-			code: 500,
-			error: true
-		});
-		return;
-	}
+            session.bind(uid);
+            session.set('rid', rid);
+            session.push('rid', function (err) {
+                if (err) {
+                    console.error('set rid for session service failed! error is : %j', err.stack);
+                }
+            });
+            session.on('closed', onUserLeave.bind(null, self.app));
 
-	session.bind(uid);
-	session.set('rid', rid);
-	session.push('rid', function(err) {
-		if(err) {
-			console.error('set rid for session service failed! error is : %j', err.stack);
-		}
-	});
-	session.on('closed', onUserLeave.bind(null, self.app));
-
-	//put user into channel
-	self.app.rpc.chat.chatRemote.add(session, uid, self.app.get('serverId'), rid, true, function(users){
-		next(null, {
-			users:users
-		});
-	});
-};
+            //put user into channel
+            self.app.rpc.chat.chatRemote.add(session, uid, self.app.get('serverId'), rid, true, function (users) {
+                next(null, {
+                    code:500,
+                    users: users
+                });
+            });
+        } else {
+            console.error('[register] not ok ');
+            next(null, {
+                code: 302,
+                error: true
+            });
+            return;
+        }
+    });
+}
 
 /**
  * User log out handler
